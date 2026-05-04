@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#e8d5f5">
+    <title>娜塔莎模拟器</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(160deg, #e8d5f5 0%, #d4b8e8 40%, #c9a7e0 100%);
+            touch-action: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* ===== 顶部标题栏 ===== */
+        #top-bar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            padding: env(safe-area-inset-top, 12px) 16px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .app-title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 900;
+            color: #4a2060;
+            text-shadow: 0 2px 12px rgba(255,255,255,0.5);
+            letter-spacing: 1px;
+        }
+        .app-title span {
+            color: #9b59b6;
+        }
+        .top-icons {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+        .top-icon-btn {
+            width: 38px; height: 38px;
+            border-radius: 12px;
+            border: none;
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #6b3a8a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .top-icon-btn:active {
+            transform: scale(0.9);
+            background: rgba(255,255,255,0.7);
+        }
+        .top-icon-btn.is-muted {
+            color: rgba(106,58,138,0.4);
+        }
+
+        /* ===== 底部信息栏 ===== */
+        #bottom-bar {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            padding: 0 16px env(safe-area-inset-bottom, 16px);
+            z-index: 20;
+            pointer-events: none;
+        }
+        .info-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .info-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.55);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #5a2d72;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        #feedback-chip {
+            color: #9b59b6;
+            min-width: 90px;
+            justify-content: center;
+        }
+        #feedback-chip.pulse {
+            transform: scale(1.06);
+            background: rgba(155,89,182,0.2);
+        }
+
+        /* ===== 底部操作按钮 ===== */
+        .action-bar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            pointer-events: auto;
+        }
+        .action-btn {
+            flex: 1;
+            max-width: 120px;
+            height: 48px;
+            border-radius: 16px;
+            border: none;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .action-btn:active {
+            transform: scale(0.93);
+        }
+        .btn-reset {
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #6b3a8a;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .btn-slam {
+            background: linear-gradient(135deg, #c39bd3, #a569bd);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(165,105,189,0.35);
+        }
+        .btn-water {
+            background: linear-gradient(135deg, #d2b4de, #bb8fce);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(187,143,206,0.35);
+        }
+
+        /* ===== 作者信息 ===== */
+        .app-author {
+            margin: 2px 0 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(90,45,114,0.6);
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== 中间操作提示 ===== */
+        #hint-banner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 24px;
+            border-radius: 24px;
+            background: rgba(255,255,255,0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            color: #5a2d72;
+            font-size: 15px;
+            font-weight: 700;
+            border: 1px solid rgba(255,255,255,0.35);
+            box-shadow: 0 4px 20px rgba(90,45,114,0.12);
+            z-index: 15;
+            pointer-events: none;
+            animation: hintFade 4s ease-in-out forwards;
+        }
+        .hint-divider {
+            color: rgba(90,45,114,0.3);
+            font-size: 18px;
+        }
+        @keyframes hintFade {
+            0%, 70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* ===== 手机端适配 ===== */
+        @media (max-width: 480px) {
+            .app-title { font-size: 17px; }
+            .app-author { font-size: 11px; }
+            .top-icon-btn { width: 34px; height: 34px; border-radius: 10px; }
+            .info-chip { font-size: 12px; padding: 5px 11px; }
+            .action-btn { height: 44px; font-size: 14px; border-radius: 14px; }
+            #hint-banner { font-size: 13px; padding: 8px 18px; gap: 8px; }
+        }
+        @media (min-width: 768px) {
+            #bottom-bar { max-width: 480px; left: 50%; transform: translateX(-50%); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部标题栏 -->
+    <div id="top-bar">
+        <div>
+            <h1 class="app-title">娜塔莎<span>模拟器</span></h1>
+            <p class="app-author">作者：cc</p>
+        </div>
+        <div class="top-icons">
+            <button id="sound-toggle" class="top-icon-btn" title="声音开关" aria-label="声音开关">
+                <svg id="sound-on-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+                <svg id="sound-off-icon" style="display:none" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 中间操作提示 - 显眼位置 -->
+    <div id="hint-banner">
+        <span>👆 单指捏拉</span>
+        <span class="hint-divider">·</span>
+        <span>✌️ 双指旋转缩放</span>
+    </div>
+
+    <!-- 底部信息和操作栏 -->
+    <div id="bottom-bar">
+        <div class="info-row">
+            <div id="squish-count" class="info-chip">🤏 按压 0 次</div>
+            <div id="feedback-chip" class="info-chip">准备开捏</div>
+        </div>
+        <div class="action-bar">
+            <button id="reset-btn" class="action-btn btn-reset" onclick="resetNatasha()" title="重置" aria-label="重置">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                重置
+            </button>
+            <button id="slam-btn" class="action-btn btn-slam" title="摔到地上变一摊" aria-label="摔到地上变一摊">
+                💥 摔扁
+            </button>
+            <button id="water-btn" class="action-btn btn-water" title="灌水后身体浮肿" aria-label="灌水后身体浮肿">
+                💧 灌水
+            </button>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let natashaGroup, shadowMesh;
+        let raycaster, mouse;
+        
+        let isDragging = false;
+        let draggedType = null; 
+        let dragPlane = new THREE.Plane();
+        
+        let dragStart3D = new THREE.Vector3();
+        let currentMouse3D = new THREE.Vector3();
+        let dragVector = new THREE.Vector3();
+        
+        let dragTarget = new THREE.Vector3();
+        let dragOffset = new THREE.Vector3();
+        let draggedNode = null;
+        let dragEnergy = 0;
+
+        let audioCtx = null;
+        let audioEnabled = true;
+        let audioReady = false;
+        let stretchSoundTimer = 0;
+        let squishCount = 0;
+        let feedbackTimer = null;
+        let puddleAmount = 0;
+        let waterAmount = 0;
+        const torsoMeshes = [];
+
+        // --- 物理系统参数 ---
+        const nodes = { body: { pos: new THREE.Vector3(0, -0.2, 0), vel: new THREE.Vector3() } };
+        const limbs = [];
+        
+        const LIMB_PHYSICS = {
+            returnStiffness: 0.15,
+            damping: 0.75,
+            dragStrength: 0.4,
+            bodyPullRatio: 0.05,
+            maxStretch: 2.8 
+        };
+
+        const softBodyMeshes = [];
+        const SOFT_PHYSICS = {
+            stiffness: 0.02,       
+            damping: 0.60,         
+            dragPull: 0.35,
+            influenceRadius: 2.2,   
+            stretchMultiplier: 1.5,
+            maxStretch: 0.85,
+            healingSpeed: 0.002    
+        };
+
+        // 娜塔莎配色 - 黑人婴儿深棕黑色皮肤
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0x2c1810, roughness: 0.68, metalness: 0.0 });
+        const diaperMat = new THREE.MeshStandardMaterial({ color: 0xe8b830, roughness: 0.55, metalness: 0.0, side: THREE.DoubleSide });
+        const lipMat = new THREE.MeshStandardMaterial({ color: 0xe8608a, roughness: 0.4, metalness: 0.0 });
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0a0503 });
+        const darkSkinMat = skinMat.clone();
+        darkSkinMat.color.setHex(0x1a0e08);
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return null;
+                audioCtx = new AudioContextClass();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            audioReady = true;
+            return audioCtx;
+        }
+
+        function setAudioUi() {
+            const toggle = document.getElementById('sound-toggle');
+            const onIcon = document.getElementById('sound-on-icon');
+            const offIcon = document.getElementById('sound-off-icon');
+            if (!toggle || !onIcon || !offIcon) return;
+
+            toggle.classList.toggle('is-muted', !audioEnabled);
+            onIcon.style.display = audioEnabled ? 'block' : 'none';
+            offIcon.style.display = audioEnabled ? 'none' : 'block';
+            toggle.title = audioEnabled ? '关闭声音' : '打开声音';
+        }
+
+        function playTone({ frequency = 120, duration = 0.12, gain = 0.08, type = 'sine', detune = 0, slideTo = null }) {
+            if (!audioEnabled) return;
+            const ctx = getAudioContext();
+            if (!ctx) return;
+
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const amp = ctx.createGain();
+            const filter = ctx.createBiquadFilter();
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(frequency, now);
+            osc.detune.setValueAtTime(detune, now);
+            if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), now + duration);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(520, now);
+            filter.Q.setValueAtTime(0.7, now);
+
+            amp.gain.setValueAtTime(0.0001, now);
+            amp.gain.exponentialRampToValueAtTime(Math.max(0.0001, gain), now + 0.012);
+            amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            osc.connect(filter);
+            filter.connect(amp);
+            amp.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration + 0.02);
+        }
+
+        function playNoise(duration = 0.08, gain = 0.035, cutoff = 360) {
+            if (!audioEnabled) return;
+            const ctx = getAudioContext();
+            if (!ctx) return;
+
+            const now = ctx.currentTime;
+            const sampleCount = Math.max(1, Math.floor(ctx.sampleRate * duration));
+            const buffer = ctx.createBuffer(1, sampleCount, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < sampleCount; i++) {
+                data[i] = (Math.random() * 2 - 1) * (1 - i / sampleCount);
+            }
+
+            const source = ctx.createBufferSource();
+            const filter = ctx.createBiquadFilter();
+            const amp = ctx.createGain();
+
+            source.buffer = buffer;
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(cutoff, now);
+            amp.gain.setValueAtTime(gain, now);
+            amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            source.connect(filter);
+            filter.connect(amp);
+            amp.connect(ctx.destination);
+            source.start(now);
+            source.stop(now + duration);
+        }
+
+        function playSquishSound(intensity = 0.6) {
+            const amount = THREE.MathUtils.clamp(intensity, 0.15, 1);
+            playTone({ frequency: 88 + amount * 44, slideTo: 42 + amount * 28, duration: 0.13, gain: 0.05 + amount * 0.035, type: 'triangle' });
+            playNoise(0.09 + amount * 0.04, 0.018 + amount * 0.018, 240 + amount * 260);
+        }
+
+        function playStretchSound(intensity = 0.4) {
+            const now = performance.now();
+            if (now - stretchSoundTimer < 90) return;
+            stretchSoundTimer = now;
+
+            const amount = THREE.MathUtils.clamp(intensity, 0.08, 1);
+            playTone({ frequency: 95 + amount * 60, slideTo: 85 + amount * 45, duration: 0.08, gain: 0.018 + amount * 0.02, type: 'sine' });
+            playNoise(0.055, 0.01 + amount * 0.012, 300 + amount * 480);
+        }
+
+        function playReleaseSound(intensity = 0.5) {
+            const amount = THREE.MathUtils.clamp(intensity, 0.1, 1);
+            playTone({ frequency: 120 + amount * 70, slideTo: 75 + amount * 34, duration: 0.16, gain: 0.035 + amount * 0.04, type: 'sine' });
+        }
+
+        function playResetSound() {
+            playTone({ frequency: 190, slideTo: 260, duration: 0.11, gain: 0.04, type: 'triangle' });
+            setTimeout(() => playTone({ frequency: 260, slideTo: 210, duration: 0.13, gain: 0.032, type: 'sine' }), 70);
+        }
+
+        function playSlamSound() {
+            if (!audioEnabled) return;
+            playTone({ frequency: 180, slideTo: 62, duration: 0.18, gain: 0.045, type: 'sawtooth' });
+            setTimeout(() => {
+                playTone({ frequency: 66, slideTo: 28, duration: 0.26, gain: 0.13, type: 'triangle' });
+                playNoise(0.12, 0.08, 180);
+            }, 105);
+            setTimeout(() => {
+                playTone({ frequency: 44, slideTo: 36, duration: 0.18, gain: 0.055, type: 'sine' });
+                playNoise(0.24, 0.036, 320);
+            }, 205);
+        }
+
+        function playWaterSound() {
+            playTone({ frequency: 120, slideTo: 92, duration: 0.18, gain: 0.05, type: 'sine' });
+            playNoise(0.22, 0.032, 620);
+        }
+
+        function updateSquishCount() {
+            const countEl = document.getElementById('squish-count');
+            if (countEl) countEl.textContent = `按压 ${squishCount} 次`;
+        }
+
+        function showFeedback(text, pulse = true) {
+            const chip = document.getElementById('feedback-chip');
+            if (!chip) return;
+
+            chip.textContent = text;
+            if (feedbackTimer) clearTimeout(feedbackTimer);
+            chip.classList.toggle('pulse', pulse);
+            feedbackTimer = setTimeout(() => chip.classList.remove('pulse'), 170);
+        }
+
+        function toggleSound() {
+            audioEnabled = !audioEnabled;
+            if (audioEnabled) {
+                getAudioContext();
+                showFeedback(audioReady ? '声音开启' : '点击开声');
+                playResetSound();
+            } else {
+                showFeedback('安静模式');
+            }
+            setAudioUi();
+        }
+
+        function storeVisualBase(mesh) {
+            mesh.userData.visualBaseScale = mesh.scale.clone();
+            mesh.userData.visualBasePosition = mesh.position.clone();
+            mesh.userData.visualBaseRotation = mesh.rotation.clone();
+        }
+
+        function applyVisualModes() {
+            const puddle = THREE.MathUtils.clamp(puddleAmount, 0, 1);
+            const water = THREE.MathUtils.clamp(waterAmount, 0, 1);
+
+            natashaGroup.scale.set(
+                1 + puddle * 1.05,
+                1 - puddle * 0.72,
+                1 + puddle * 0.72
+            );
+            natashaGroup.rotation.z = puddle * -0.08;
+
+            softBodyMeshes.forEach(mesh => {
+                if (!mesh.userData.visualBaseScale) storeVisualBase(mesh);
+                mesh.scale.copy(mesh.userData.visualBaseScale);
+                mesh.position.copy(mesh.userData.visualBasePosition);
+                mesh.rotation.copy(mesh.userData.visualBaseRotation);
+            });
+
+            torsoMeshes.forEach(mesh => {
+                const baseScale = mesh.userData.visualBaseScale || mesh.scale;
+                const basePosition = mesh.userData.visualBasePosition || mesh.position;
+                mesh.scale.set(
+                    baseScale.x * (1 + water * 0.58),
+                    baseScale.y * (1 + water * 0.36),
+                    baseScale.z * (1 + water * 0.62)
+                );
+                mesh.position.set(
+                    basePosition.x,
+                    basePosition.y + water * 0.05,
+                    basePosition.z
+                );
+            });
+        }
+
+        function slamToPuddle() {
+            getAudioContext();
+            waterAmount = 0;
+            puddleAmount = 1;
+            nodes.body.pos.y = -0.8;
+            nodes.body.vel.set(0, -0.35, 0);
+            limbs.forEach((limb, index) => {
+                const spread = index < 2 ? 1.05 : 0.55;
+                const side = index % 2 === 0 ? 1 : -1;
+                limb.tipPos.x += side * spread;
+                limb.tipPos.y = Math.min(limb.tipPos.y, -1.15);
+                limb.tipVel.set(side * 0.12, -0.08, 0.05);
+            });
+            showFeedback('啪叽，一摊');
+            playSlamSound();
+        }
+
+        function inflateBody() {
+            getAudioContext();
+            puddleAmount = 0;
+            waterAmount = waterAmount > 0.95 ? 0 : Math.min(1, waterAmount + 0.34);
+            nodes.body.vel.add(new THREE.Vector3(0, 0.08, 0));
+            showFeedback(waterAmount > 0 ? `浮肿 ${Math.round(waterAmount * 100)}%` : '水放掉了');
+            playWaterSound();
+        }
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.2, 9);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // ==========================================
+            // 🎥 360° 轨道控制器配置
+            // ==========================================
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true; 
+            controls.dampingFactor = 0.05;
+            controls.enablePan = false;    
+            
+            controls.mouseButtons = {
+                LEFT: null, 
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.ROTATE
+            };
+            controls.touches = {
+                ONE: null,
+                TWO: THREE.TOUCH.DOLLY_ROTATE
+            };
+            
+            controls.minDistance = 3;
+            controls.maxDistance = 15;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1; 
+            controls.target.set(0, 0, 0);
+
+            const keyLight = new THREE.DirectionalLight(0xfff0e0, 1.0);
+            keyLight.position.set(5, 8, 6);
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.set(2048, 2048);
+            scene.add(keyLight);
+
+            const fillLight = new THREE.DirectionalLight(0xe8e0f0, 0.5);
+            fillLight.position.set(-6, 2, 4);
+            scene.add(fillLight);
+
+            const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
+            rimLight.position.set(0, 6, -8);
+            scene.add(rimLight);
+
+            scene.add(new THREE.AmbientLight(0x888088, 1.4));
+
+            createNatasha();
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            window.addEventListener('resize', onWindowResize, false);
+            
+            const container = document.getElementById('canvas-container');
+            container.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            container.addEventListener('mousedown', onPointerDown, false);
+            window.addEventListener('mousemove', onPointerMove, false);
+            window.addEventListener('mouseup', onPointerUp, false);
+            
+            container.addEventListener('touchstart', onPointerDown, { passive: false });
+            window.addEventListener('touchmove', onPointerMove, { passive: false });
+            window.addEventListener('touchend', onPointerUp, false);
+
+            const soundToggle = document.getElementById('sound-toggle');
+            if (soundToggle) soundToggle.addEventListener('click', toggleSound);
+            const slamBtn = document.getElementById('slam-btn');
+            const waterBtn = document.getElementById('water-btn');
+            if (slamBtn) slamBtn.addEventListener('click', slamToPuddle);
+            if (waterBtn) waterBtn.addEventListener('click', inflateBody);
+            setAudioUi();
+        }
+
+        function addSoftBody(mesh, group) {
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.type = 'softbody'; 
+            storeVisualBase(mesh);
+            softBodyMeshes.push(mesh);
+            group.add(mesh);
+        }
+
+        function createNatasha() {
+            natashaGroup = new THREE.Group();
+
+            // ==========================================
+            // 🎨 头部 - 黑人婴儿圆头
+            // ==========================================
+            const headGroup = new THREE.Group();
+            headGroup.position.y = 1.55;
+
+            // 头部主体 - 婴儿比例的大圆头
+            const headGeo = new THREE.SphereGeometry(0.85, 48, 48);
+            headGeo.scale(1.0, 0.95, 0.95);
+            const headMesh = new THREE.Mesh(headGeo, skinMat);
+            addSoftBody(headMesh, headGroup);
+
+            // ==========================================
+            // 👀 眯眼 - 厌世脸线条
+            // ==========================================
+            const eyeGeoL = new THREE.CapsuleGeometry(0.015, 0.22, 8, 12);
+            eyeGeoL.rotateZ(Math.PI / 2);
+            const eyeL = new THREE.Mesh(eyeGeoL, eyeMat);
+            // 眼睛精确贴合球面: z = sqrt(0.85² - 0.28² - 0.1²) ≈ 0.796
+            eyeL.position.set(0.28, 0.1, 0.796);
+            eyeL.rotation.set(0.1, 0.15, 0.08);
+            addSoftBody(eyeL, headGroup);
+
+            const eyeR = eyeL.clone();
+            eyeR.position.x = -0.28;
+            eyeR.rotation.set(0.1, -0.15, -0.08);
+            addSoftBody(eyeR, headGroup);
+
+            // ==========================================
+            // 👃 鼻子 - 精确贴合球面: z = sqrt(0.85² - 0.06²) ≈ 0.848
+            // ==========================================
+            const noseGeo = new THREE.SphereGeometry(0.12, 20, 20);
+            noseGeo.scale(1.3, 0.5, 0.4);
+            const nose = new THREE.Mesh(noseGeo, skinMat);
+            nose.position.set(0, -0.06, 0.848);
+            addSoftBody(nose, headGroup);
+
+            // ==========================================
+            // 👄 粉红嘴唇 - 精确贴合球面
+            // ==========================================
+            // 上唇: z = sqrt(0.85² - 0.2²) ≈ 0.826
+            const lipTopGeo = new THREE.SphereGeometry(0.16, 24, 24);
+            lipTopGeo.scale(1.15, 0.28, 0.45);
+            const lipTop = new THREE.Mesh(lipTopGeo, lipMat);
+            lipTop.position.set(0, -0.2, 0.826);
+            addSoftBody(lipTop, headGroup);
+
+            // 下唇: z = sqrt(0.85² - 0.3²) ≈ 0.795
+            const lipBotGeo = new THREE.SphereGeometry(0.16, 24, 24);
+            lipBotGeo.scale(1.15, 0.28, 0.45);
+            const lipBot = new THREE.Mesh(lipBotGeo, lipMat);
+            lipBot.position.set(0, -0.3, 0.795);
+            addSoftBody(lipBot, headGroup);
+
+            natashaGroup.add(headGroup);
+
+            // ==========================================
+            // 🎨 短脖子 - 明显可见
+            // ==========================================
+            const neckGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.2, 20);
+            const neck = new THREE.Mesh(neckGeo, skinMat);
+            neck.position.set(0, 1.0, 0.02);
+            addSoftBody(neck, natashaGroup);
+
+            // ==========================================
+            // 🎨 身体 - 婴儿比例，不太大
+            // ==========================================
+            const bodyGeo = new THREE.SphereGeometry(0.75, 40, 40);
+            bodyGeo.scale(0.95, 1.1, 0.88);
+            const body = new THREE.Mesh(bodyGeo, skinMat);
+            body.position.set(0, 0.35, 0.05);
+            addSoftBody(body, natashaGroup);
+            torsoMeshes.push(body);
+
+            // 黄色纸尿裤 - 紧贴身体和裆部
+            const diaperGeo = new THREE.SphereGeometry(0.74, 40, 40, 0, Math.PI * 2, 0, Math.PI * 0.42);
+            diaperGeo.scale(0.92, 1.08, 0.85);
+            const diaper = new THREE.Mesh(diaperGeo, diaperMat);
+            diaper.position.set(0, 0.22, 0.05);
+            diaper.rotation.x = Math.PI;
+            addSoftBody(diaper, natashaGroup);
+            torsoMeshes.push(diaper);
+
+            // 纸尿裤腰部边缘 - 紧贴腰线
+            const waistGeo = new THREE.TorusGeometry(0.6, 0.02, 8, 32);
+            waistGeo.scale(1.0, 0.3, 0.85);
+            const waist = new THREE.Mesh(waistGeo, diaperMat);
+            waist.position.set(0, 0.55, 0.05);
+            waist.rotation.x = Math.PI / 2;
+            addSoftBody(waist, natashaGroup);
+            torsoMeshes.push(waist);
+
+            // 左腿纸尿裤边缘 - 紧贴腿部
+            const legBandGeoL = new THREE.TorusGeometry(0.18, 0.02, 8, 20);
+            const legBandL = new THREE.Mesh(legBandGeoL, diaperMat);
+            legBandL.position.set(0.2, -0.05, 0.05);
+            legBandL.rotation.x = Math.PI / 2;
+            addSoftBody(legBandL, natashaGroup);
+            torsoMeshes.push(legBandL);
+
+            // 右腿纸尿裤边缘 - 紧贴腿部
+            const legBandGeoR = new THREE.TorusGeometry(0.18, 0.02, 8, 20);
+            const legBandR = new THREE.Mesh(legBandGeoR, diaperMat);
+            legBandR.position.set(-0.2, -0.05, 0.05);
+            legBandR.rotation.x = Math.PI / 2;
+            addSoftBody(legBandR, natashaGroup);
+            torsoMeshes.push(legBandR);
+
+            // 裆部纸尿裤 - 连接两腿之间
+            const crotchGeo = new THREE.CylinderGeometry(0.15, 0.12, 0.3, 16);
+            const crotch = new THREE.Mesh(crotchGeo, diaperMat);
+            crotch.position.set(0, -0.02, 0.05);
+            addSoftBody(crotch, natashaGroup);
+            torsoMeshes.push(crotch);
+
+            // ==========================================
+            // 🔥 四肢 - 婴儿比例，腿更长
+            // ==========================================
+            const armAnchorL = new THREE.Vector3(0.58, 0.55, 0);
+            const armAnchorR = new THREE.Vector3(-0.58, 0.55, 0);
+            const legAnchorL = new THREE.Vector3(0.22, -0.15, 0.05);
+            const legAnchorR = new THREE.Vector3(-0.22, -0.15, 0.05);
+
+            function createLimbGroup(isArm, isLeft, length) {
+                const group = new THREE.Group();
+                const sign = isLeft ? 1 : -1;
+
+                const rBase = isArm ? 0.16 : 0.2;
+                const rTip = isArm ? 0.13 : 0.17;
+
+                // 四肢主体
+                const geo = new THREE.CylinderGeometry(rBase, rTip, length, 28);
+                const mesh = new THREE.Mesh(geo, skinMat);
+                mesh.rotation.x = -Math.PI / 2;
+                mesh.position.set(0, 0, length / 2);
+                group.add(mesh);
+
+                // 末端关节球
+                const tipJoint = new THREE.Mesh(new THREE.SphereGeometry(rTip * 1.1, 24, 24), skinMat);
+                tipJoint.position.set(0, 0, length);
+                if (!isArm) {
+                    tipJoint.scale.set(1.1, 1.2, 0.6);
+                    tipJoint.position.y += 0.08;
+                } else {
+                    tipJoint.scale.set(0.9, 0.75, 1.0);
+                }
+                group.add(tipJoint);
+
+                group.traverse(m => {
+                    if (m.isMesh) {
+                        m.castShadow = true; m.receiveShadow = true;
+                        m.userData.type = 'limb';
+                    }
+                });
+                return group;
+            }
+
+            function addLimb(id, isArm, isLeft, anchor, restTip) {
+                let length = anchor.distanceTo(restTip);
+                let group = createLimbGroup(isArm, isLeft, length);
+
+                let node = {
+                    id: id,
+                    group: group,
+                    baseAnchor: anchor.clone(),
+                    initAnchor: anchor.clone(),
+                    currentAnchor: anchor.clone(),
+                    anchorVel: new THREE.Vector3(),
+                    restTipLocalOffset: restTip.clone().sub(anchor),
+                    tipPos: restTip.clone().add(nodes.body.pos),
+                    tipVel: new THREE.Vector3(),
+                    length: length
+                };
+
+                group.traverse(m => { if (m.isMesh) m.userData.node = node; });
+                natashaGroup.add(group);
+                limbs.push(node);
+            }
+
+            // 手臂
+            addLimb('armL', true, true, armAnchorL, new THREE.Vector3(1.0, 0.0, 0.05));
+            addLimb('armR', true, false, armAnchorR, new THREE.Vector3(-1.0, 0.0, 0.05));
+            // 腿部 - 更长
+            addLimb('legL', false, true, legAnchorL, new THREE.Vector3(0.3, -1.3, 0.1));
+            addLimb('legR', false, false, legAnchorR, new THREE.Vector3(-0.3, -1.3, 0.1));
+
+            scene.add(natashaGroup);
+
+            const shadowGeo = new THREE.PlaneGeometry(8, 8);
+            const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false });
+            shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+            shadowMesh.rotation.x = -Math.PI / 2;
+            shadowMesh.position.y = -1.5;
+            scene.add(shadowMesh);
+
+            natashaGroup.updateMatrixWorld(true);
+            softBodyMeshes.forEach(mesh => {
+                const geometry = mesh.geometry;
+                mesh.userData.basePositions = geometry.attributes.position.clone();
+                mesh.userData.initialPositions = geometry.attributes.position.clone();
+                mesh.userData.currentPositions = geometry.attributes.position.clone();
+                mesh.userData.velocities = new Float32Array(geometry.attributes.position.count * 3);
+            });
+        }
+
+        // ==========================================
+        // 🔄 一键复原逻辑
+        // ==========================================
+        window.resetNatasha = function() {
+            nodes.body.pos.set(0, -0.2, 0);
+            nodes.body.vel.set(0, 0, 0);
+            natashaGroup.position.copy(nodes.body.pos);
+
+            for (let limb of limbs) {
+                limb.initAnchor.copy(limb.baseAnchor);
+                limb.currentAnchor.copy(limb.baseAnchor);
+                limb.anchorVel.set(0, 0, 0);
+
+                let restTip = limb.baseAnchor.clone().add(limb.restTipLocalOffset);
+                limb.tipPos.copy(restTip).add(nodes.body.pos);
+                limb.tipVel.set(0, 0, 0);
+                
+                limb.group.position.copy(limb.baseAnchor);
+                limb.group.quaternion.identity(); 
+                limb.group.scale.set(1, 1, 1);    
+            }
+
+            softBodyMeshes.forEach(mesh => {
+                const basePositions = mesh.userData.basePositions;
+                const initialPositions = mesh.userData.initialPositions;
+                const currentPositions = mesh.userData.currentPositions;
+                const velocities = mesh.userData.velocities;
+                const count = initialPositions.count;
+
+                for (let i = 0; i < count; i++) {
+                    const bx = basePositions.getX(i);
+                    const by = basePositions.getY(i);
+                    const bz = basePositions.getZ(i);
+
+                    initialPositions.setXYZ(i, bx, by, bz);
+                    currentPositions.setXYZ(i, bx, by, bz);
+                    
+                    velocities[i*3] = 0;
+                    velocities[i*3+1] = 0;
+                    velocities[i*3+2] = 0;
+                }
+
+                mesh.geometry.attributes.position.copy(currentPositions);
+                mesh.geometry.attributes.position.needsUpdate = true;
+                mesh.geometry.computeVertexNormals();
+            });
+            
+            isDragging = false;
+            draggedType = null;
+            draggedNode = null;
+            document.body.style.cursor = 'default';
+            
+            camera.position.set(0, 1.2, 9);
+            controls.target.set(0, 0, 0);
+            controls.update();
+
+            puddleAmount = 0;
+            waterAmount = 0;
+            natashaGroup.scale.set(1, 1, 1);
+            natashaGroup.rotation.set(0, 0, 0);
+            softBodyMeshes.forEach(mesh => {
+                if (mesh.userData.visualBaseScale) mesh.scale.copy(mesh.userData.visualBaseScale);
+                if (mesh.userData.visualBasePosition) mesh.position.copy(mesh.userData.visualBasePosition);
+                if (mesh.userData.visualBaseRotation) mesh.rotation.copy(mesh.userData.visualBaseRotation);
+            });
+            squishCount = 0;
+            dragEnergy = 0;
+            updateSquishCount();
+            showFeedback('已经复原');
+            playResetSound();
+        };
+
+        function getEventCoords(e) {
+            if (e.changedTouches) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+            return { x: e.clientX, y: e.clientY };
+        }
+
+        function onPointerDown(e) {
+            if(e.target.closest('#reset-btn')) return;
+            if (e.button === 2) return;
+            if (e.touches && e.touches.length > 1) return;
+
+            getAudioContext();
+            dragEnergy = 0;
+            e.preventDefault();
+            const coords = getEventCoords(e);
+            mouse.x = (coords.x / window.innerWidth) * 2 - 1;
+            mouse.y = -(coords.y / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            
+            let interactables = [];
+            natashaGroup.traverse(c => { if(c.isMesh && c.geometry.type !== 'PlaneGeometry') interactables.push(c); });
+            const intersects = raycaster.intersectObjects(interactables);
+
+            if (intersects.length > 0) {
+                isDragging = true;
+                document.body.style.cursor = 'grabbing';
+                const hitObj = intersects[0].object;
+
+                const hitPoint = intersects[0].point;
+                const punchDir = raycaster.ray.direction.clone().normalize();
+
+                if (hitObj.userData.type === 'limb') {
+                    draggedType = 'limb';
+                    draggedNode = hitObj.userData.node;
+                    
+                    dragTarget.copy(intersects[0].point);
+                    dragOffset.copy(draggedNode.tipPos).sub(dragTarget);
+                    const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
+                    dragPlane.setFromNormalAndCoplanarPoint(normal, dragTarget);
+                    showFeedback('轻轻拉伸');
+                    playSquishSound(0.35);
+                } else {
+                    draggedType = 'softbody';
+                    squishCount += 1;
+                    updateSquishCount();
+                    showFeedback('软软陷下去');
+                    playSquishSound(0.75);
+                    
+                    const curInvMatrix = natashaGroup.matrixWorld.clone().invert();
+                    const localHitPoint = hitPoint.clone().applyMatrix4(curInvMatrix);
+                    const localPunchDir = punchDir.clone().transformDirection(curInvMatrix).normalize();
+                    const maxDentDepth = 0.55; 
+                    const dentRadius = 0.8;    
+
+                    for (let limb of limbs) {
+                        let dist = limb.initAnchor.distanceTo(localHitPoint);
+                        if (dist < dentRadius) {
+                            let weight = Math.exp(-(dist * dist) / (0.35 * 0.35)); 
+                            let dentOffset = localPunchDir.clone().multiplyScalar(weight * maxDentDepth);
+                            limb.initAnchor.add(dentOffset);
+                            limb.currentAnchor.add(dentOffset);
+                        }
+                    }
+
+                    softBodyMeshes.forEach(mesh => {
+                        const initialPositions = mesh.userData.initialPositions;
+                        const currentPositions = mesh.userData.currentPositions;
+                        
+                        const meshInvMatrix = mesh.matrixWorld.clone().invert();
+                        const meshHitPoint = hitPoint.clone().applyMatrix4(meshInvMatrix);
+                        const meshPunchDir = punchDir.clone().transformDirection(meshInvMatrix).normalize();
+
+                        for (let i = 0; i < initialPositions.count; i++) {
+                            const vInit = new THREE.Vector3().fromBufferAttribute(initialPositions, i);
+                            const dist = vInit.distanceTo(meshHitPoint);
+
+                            if (dist < dentRadius) {
+                                const weight = Math.exp(-(dist * dist) / (0.35 * 0.35)); 
+                                const dentOffset = meshPunchDir.clone().multiplyScalar(weight * maxDentDepth);
+
+                                vInit.add(dentOffset);
+                                initialPositions.setXYZ(i, vInit.x, vInit.y, vInit.z);
+                                
+                                const vCurr = new THREE.Vector3().fromBufferAttribute(currentPositions, i);
+                                vCurr.add(dentOffset);
+                                currentPositions.setXYZ(i, vCurr.x, vCurr.y, vCurr.z);
+                            }
+                        }
+                        mesh.geometry.attributes.position.copy(currentPositions);
+                        mesh.geometry.attributes.position.needsUpdate = true;
+                        mesh.geometry.computeVertexNormals();
+                    });
+
+                    dragStart3D.copy(intersects[0].point);
+                    currentMouse3D.copy(dragStart3D);
+                    dragVector.set(0, 0, 0);
+                    const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
+                    dragPlane.setFromNormalAndCoplanarPoint(normal, dragStart3D);
+                }
+            }
+        }
+
+        function onPointerMove(e) {
+            if (!isDragging) {
+                document.body.style.cursor = 'grab';
+                return;
+            }
+            e.preventDefault();
+            const coords = getEventCoords(e);
+            mouse.x = (coords.x / window.innerWidth) * 2 - 1;
+            mouse.y = -(coords.y / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            if (draggedType === 'limb') {
+                const target = new THREE.Vector3();
+                if (raycaster.ray.intersectPlane(dragPlane, target)) {
+                    dragTarget.copy(target);
+                    if (draggedNode) {
+                        dragEnergy = Math.max(dragEnergy, target.distanceTo(draggedNode.tipPos));
+                        const stretch = THREE.MathUtils.clamp(dragEnergy / 2.4, 0, 1);
+                        if (stretch > 0.08) {
+                            showFeedback(`拉伸感 ${Math.round(stretch * 100)}%`, false);
+                            playStretchSound(stretch);
+                        }
+                    }
+                }
+            } else if (draggedType === 'softbody') {
+                const target = new THREE.Vector3();
+                if (raycaster.ray.intersectPlane(dragPlane, target)) {
+                    currentMouse3D.copy(target);
+                    dragVector.subVectors(currentMouse3D, dragStart3D);
+                    dragEnergy = Math.max(dragEnergy, dragVector.length());
+                    const squish = THREE.MathUtils.clamp(dragVector.length() / 2.2, 0, 1);
+                    if (squish > 0.08) {
+                        showFeedback(`揉捏感 ${Math.round(squish * 100)}%`, false);
+                        playStretchSound(squish);
+                    }
+                }
+            }
+        }
+
+        function onPointerUp(e) {
+            if (e.button === 2) return; 
+            if (isDragging) {
+                const release = THREE.MathUtils.clamp(dragEnergy / 2.2, 0.12, 1);
+                playReleaseSound(release);
+                showFeedback(release > 0.45 ? '弹回来了' : '轻轻回弹');
+            }
+            isDragging = false;
+            draggedType = null;
+            draggedNode = null;
+            dragEnergy = 0;
+            document.body.style.cursor = 'default';
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            controls.update();
+
+            let bodyPos = nodes.body.pos;
+            const curNatashaInvMatrix = natashaGroup.matrixWorld.clone().invert();
+
+            // ==========================================
+            // 1. 骨肉同频
+            // ==========================================
+            for (let limb of limbs) {
+                limb.initAnchor.lerp(limb.baseAnchor, SOFT_PHYSICS.healingSpeed);
+                
+                let softForce = new THREE.Vector3();
+                softForce.add(limb.initAnchor.clone().sub(limb.currentAnchor).multiplyScalar(SOFT_PHYSICS.stiffness));
+                
+                if (isDragging && draggedType === 'softbody') {
+                    let vInitWorld = limb.initAnchor.clone().applyMatrix4(natashaGroup.matrixWorld);
+                    let dist = vInitWorld.distanceTo(dragStart3D);
+                    let weight = Math.exp(-(dist * dist) / (SOFT_PHYSICS.influenceRadius * SOFT_PHYSICS.influenceRadius));
+                    
+                    if (weight > 0.01) {
+                        let vTargetWorld = vInitWorld.clone().addScaledVector(dragVector, weight * SOFT_PHYSICS.stretchMultiplier);
+                        let vTargetLocal = vTargetWorld.applyMatrix4(curNatashaInvMatrix);
+                        softForce.add(vTargetLocal.sub(limb.currentAnchor).multiplyScalar(SOFT_PHYSICS.dragPull * weight));
+                    }
+                }
+                
+                limb.anchorVel.add(softForce);
+                limb.anchorVel.multiplyScalar(SOFT_PHYSICS.damping);
+                limb.currentAnchor.add(limb.anchorVel);
+                
+                let stretchOffset = limb.currentAnchor.clone().sub(limb.initAnchor);
+                if (stretchOffset.lengthSq() > SOFT_PHYSICS.maxStretch * SOFT_PHYSICS.maxStretch) {
+                    stretchOffset.setLength(SOFT_PHYSICS.maxStretch);
+                    limb.currentAnchor.copy(limb.initAnchor).add(stretchOffset);
+                    limb.anchorVel.multiplyScalar(0.2); 
+                }
+            }
+
+            // ==========================================
+            // 2. IK 四肢弹簧牵引
+            // ==========================================
+            for (let limb of limbs) {
+                let anchorWorld = limb.currentAnchor.clone().add(bodyPos);
+                let restTipWorld = limb.currentAnchor.clone().add(limb.restTipLocalOffset).add(bodyPos);
+                let force = new THREE.Vector3();
+                
+                force.add(restTipWorld.clone().sub(limb.tipPos).multiplyScalar(LIMB_PHYSICS.returnStiffness));
+                
+                if (isDragging && draggedType === 'limb' && draggedNode === limb) {
+                    let target = dragTarget.clone().add(dragOffset);
+                    force.add(target.sub(limb.tipPos).multiplyScalar(LIMB_PHYSICS.dragStrength));
+                }
+                
+                limb.tipVel.add(force);
+                limb.tipVel.multiplyScalar(LIMB_PHYSICS.damping);
+                limb.tipPos.add(limb.tipVel);
+                
+                let dist = limb.tipPos.distanceTo(anchorWorld);
+                let maxDist = limb.length * LIMB_PHYSICS.maxStretch;
+                if (dist > maxDist) {
+                    let dir = limb.tipPos.clone().sub(anchorWorld).normalize();
+                    limb.tipPos.copy(anchorWorld).add(dir.multiplyScalar(maxDist));
+                    limb.tipVel.multiplyScalar(0.2); 
+                }
+                
+                let pullForce = limb.tipPos.clone().sub(restTipWorld).multiplyScalar(LIMB_PHYSICS.bodyPullRatio);
+                nodes.body.vel.add(pullForce);
+            }
+
+            // ==========================================
+            // 3. 身体质心重力位移
+            // ==========================================
+            if (isDragging && draggedType === 'softbody') {
+                nodes.body.vel.add(dragVector.clone().multiplyScalar(0.015)); 
+            }
+            nodes.body.vel.multiplyScalar(0.75); 
+            nodes.body.vel.add(new THREE.Vector3(0, -0.2, 0).sub(nodes.body.pos).multiplyScalar(0.02)); 
+            nodes.body.pos.add(nodes.body.vel);
+            
+            if (nodes.body.pos.y < -0.8) {
+                nodes.body.pos.y = -0.8;
+                nodes.body.vel.y *= -0.5;
+            }
+            natashaGroup.position.copy(nodes.body.pos);
+
+            // ==========================================
+            // 4. IK视觉对齐
+            // ==========================================
+            for (let limb of limbs) {
+                limb.group.position.copy(limb.currentAnchor); 
+                let anchorWorld = limb.currentAnchor.clone().add(bodyPos);
+                let dir = limb.tipPos.clone().sub(anchorWorld);
+                let dist = dir.length();
+                if (dist > 0.001) {
+                    dir.normalize();
+                    limb.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+                }
+                let stretch = Math.max(0.2, dist / limb.length);
+                let squash = 1 / Math.sqrt(stretch);
+                limb.group.scale.set(squash, squash, stretch);
+            }
+
+            // ==========================================
+            // 5. 软体顶点物理拉伸与愈合
+            // ==========================================
+            const vBaseLocal = new THREE.Vector3();
+            const vInitLocal = new THREE.Vector3();
+            const vInitWorld = new THREE.Vector3();
+            const vCurrentLocal = new THREE.Vector3();
+            const vTargetWorld = new THREE.Vector3();
+            const vTargetLocal = new THREE.Vector3();
+            const softVel = new THREE.Vector3();
+            const softForce = new THREE.Vector3();
+
+            softBodyMeshes.forEach(mesh => {
+                const basePositions = mesh.userData.basePositions;
+                const initialPositions = mesh.userData.initialPositions;
+                const currentPositions = mesh.userData.currentPositions;
+                const velocities = mesh.userData.velocities;
+                const count = initialPositions.count;
+
+                const meshInvMatrix = mesh.matrixWorld.clone().invert();
+                mesh.userData.invMatrix = meshInvMatrix; 
+                
+                let needsUpdate = false;
+
+                for (let i = 0; i < count; i++) {
+                    vBaseLocal.fromBufferAttribute(basePositions, i);
+                    vInitLocal.fromBufferAttribute(initialPositions, i);
+                    vCurrentLocal.fromBufferAttribute(currentPositions, i);
+                    softVel.fromArray(velocities, i * 3);
+
+                    vInitLocal.lerp(vBaseLocal, SOFT_PHYSICS.healingSpeed);
+                    initialPositions.setXYZ(i, vInitLocal.x, vInitLocal.y, vInitLocal.z);
+
+                    softForce.set(0, 0, 0);
+                    softForce.add(vInitLocal.clone().sub(vCurrentLocal).multiplyScalar(SOFT_PHYSICS.stiffness));
+
+                    if (isDragging && draggedType === 'softbody') {
+                        vInitWorld.copy(vInitLocal).applyMatrix4(mesh.matrixWorld);
+                        const dist = vInitWorld.distanceTo(dragStart3D);
+                        const weight = Math.exp(-(dist * dist) / (SOFT_PHYSICS.influenceRadius * SOFT_PHYSICS.influenceRadius));
+
+                        if (weight > 0.01) {
+                            vTargetWorld.copy(vInitWorld).addScaledVector(dragVector, weight * SOFT_PHYSICS.stretchMultiplier);
+                            vTargetLocal.copy(vTargetWorld).applyMatrix4(meshInvMatrix);
+                            softForce.add(vTargetLocal.sub(vCurrentLocal).multiplyScalar(SOFT_PHYSICS.dragPull * weight));
+                        }
+                    }
+
+                    softVel.add(softForce);
+                    softVel.multiplyScalar(SOFT_PHYSICS.damping);
+                    vCurrentLocal.add(softVel);
+
+                    const stretchOffset = vCurrentLocal.clone().sub(vInitLocal);
+                    if (stretchOffset.lengthSq() > SOFT_PHYSICS.maxStretch * SOFT_PHYSICS.maxStretch) {
+                        stretchOffset.setLength(SOFT_PHYSICS.maxStretch);
+                        vCurrentLocal.copy(vInitLocal).add(stretchOffset);
+                        softVel.multiplyScalar(0.2); 
+                    }
+
+                    softVel.toArray(velocities, i * 3);
+                    
+                    if(softVel.lengthSq() > 0.00001 || vInitLocal.distanceToSquared(vBaseLocal) > 0.0001 || (isDragging && draggedType === 'softbody')) {
+                        currentPositions.setXYZ(i, vCurrentLocal.x, vCurrentLocal.y, vCurrentLocal.z);
+                        needsUpdate = true;
+                    }
+                }
+
+                if (needsUpdate) {
+                    mesh.geometry.attributes.position.copy(currentPositions);
+                    mesh.geometry.attributes.position.needsUpdate = true;
+                    mesh.geometry.computeVertexNormals();
+                }
+            });
+
+            applyVisualModes();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
